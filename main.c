@@ -7,36 +7,7 @@
 * Related Document: See README.md
 *
 *******************************************************************************
-* Copyright 2021-2023, Cypress Semiconductor Corporation (an Infineon company) or
-* an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
-*
-* This software, including source code, documentation and related
-* materials ("Software") is owned by Cypress Semiconductor Corporation
-* or one of its affiliates ("Cypress") and is protected by and subject to
-* worldwide patent protection (United States and foreign),
-* United States copyright laws and international treaty provisions.
-* Therefore, you may use this Software only as provided in the license
-* agreement accompanying the software package from which you
-* obtained this Software ("EULA").
-* If no EULA applies, Cypress hereby grants you a personal, non-exclusive,
-* non-transferable license to copy, modify, and compile the Software
-* source code solely for use in connection with Cypress's
-* integrated circuit products.  Any reproduction, modification, translation,
-* compilation, or representation of this Software except as specified
-* above is prohibited without the express written permission of Cypress.
-*
-* Disclaimer: THIS SOFTWARE IS PROVIDED AS-IS, WITH NO WARRANTY OF ANY KIND,
-* EXPRESS OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, NONINFRINGEMENT, IMPLIED
-* WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. Cypress
-* reserves the right to make changes to the Software without notice. Cypress
-* does not assume any liability arising out of the application or use of the
-* Software or any product or circuit described in the Software. Cypress does
-* not authorize its products for use in any products where a malfunction or
-* failure of the Cypress product may reasonably be expected to result in
-* significant property damage, injury or death ("High Risk Product"). By
-* including Cypress's product in a High Risk Product, the manufacturer
-* of such system or application assumes all risk of such use and in doing
-* so agrees to indemnify Cypress against all liability.
+* $ Copyright 2021-2023 Cypress Semiconductor $
 *******************************************************************************/
 
 /*******************************************************************************
@@ -53,47 +24,48 @@
 /*******************************************************************************
 * User Configurable Macro
 *******************************************************************************/
-/* Set this to 1 to enable SWD debug*/
-#define SWD_DEBUG_ENABLE                 (0u)
+
+/* Enable this, if Serial LED needs to be enabled */
+#define ENABLE_SPI_SERIAL_LED           (1u)
+
+/* Enable this, if Tuner needs to be enabled */
+#define ENABLE_TUNER                    (1u)
 
 /*******************************************************************************
 * Fixed Macros
 *******************************************************************************/
 #define CAPSENSE_MSC0_INTR_PRIORITY      (3u)
 #define CY_ASSERT_FAILED                 (0u)
+
+/* Define the conditions to check sensor status */
 #define SENSOR_ACTIVE                    (1u)
 
-#if !SWD_DEBUG_ENABLE
 /* EZI2C interrupt priority must be higher than CAPSENSE interrupt. */
 #define EZI2C_INTR_PRIORITY              (2u)
-#endif
-/* setting recommended CDAC Dither scale value. Default is '0u' */
-#define CDAC_DITHER_SCALE                (1u)
 
-/* setting recommended CDAC Dither seed value. Default is '255u' */
-#define CDAC_DITHER_SEED                 (15u)
 
-/* setting recommended CDAC Dither poly value. Default is '142u' */
-#define CDAC_DITHER_POLY                 (9u)
 /*******************************************************************************
 * Global Variables
 *******************************************************************************/
-#if !SWD_DEBUG_ENABLE
 cy_stc_scb_ezi2c_context_t ezi2c_context;
-#endif
 stc_serial_led_context_t led_context;
 
 /*******************************************************************************
 * Function Prototypes
 *******************************************************************************/
 static void initialize_capsense(void);
-static void set_Dither_parameters(void);
 static void capsense_msc0_isr(void);
-#if !SWD_DEBUG_ENABLE
+
 static void ezi2c_isr(void);
 static void initialize_capsense_tuner(void);
-#endif
+
+#if ENABLE_SPI_SERIAL_LED
 void led_control();
+#endif
+
+#if CY_CAPSENSE_BIST_EN
+static void measure_sensor_capacitance(uint32_t *sensor_capacitance);
+#endif 
 
 /*******************************************************************************
 * Function Name: main
@@ -114,6 +86,10 @@ int main(void)
 {
     cy_rslt_t result;
 
+    #if CY_CAPSENSE_BIST_EN
+    uint32_t sensor_capacitance[CY_CAPSENSE_SENSOR_COUNT];
+    #endif
+
     /* Initialize the device and board peripherals */
     result = cybsp_init();
 
@@ -129,13 +105,15 @@ int main(void)
     /* Initialize SPI master */
     result = init_spi_master();
 
-#if !SWD_DEBUG_ENABLE
-    /* Initialize EZI2C */
     initialize_capsense_tuner();
-#endif
 
     /* Initialize MSCLP CAPSENSE */
     initialize_capsense();
+
+    #if CY_CAPSENSE_BIST_EN
+    /* Measure the self capacitance of sensor electrode using BIST */
+    measure_sensor_capacitance(sensor_capacitance);
+    #endif 
 
     /* Start the first scan */
     Cy_CapSense_ScanAllSlots(&cy_capsense_context);
@@ -147,15 +125,15 @@ int main(void)
             /* Process all widgets */
             Cy_CapSense_ProcessAllWidgets(&cy_capsense_context);
 
+            #if ENABLE_SPI_SERIAL_LED
          /* Serial LED control for showing the CAPSENSE touch status (feedback) */
             led_control();
+            #endif
 
-#if !SWD_DEBUG_ENABLE
+            #if ENABLE_TUNER
             /* Establishes synchronized communication with the CAPSENSE Tuner tool */
             Cy_CapSense_RunTuner(&cy_capsense_context);
-#endif
-
-
+            #endif
 
             /* Start the next scan */
             Cy_CapSense_ScanAllSlots(&cy_capsense_context);
@@ -192,10 +170,7 @@ static void initialize_capsense(void)
         Cy_SysInt_Init(&capsense_msc0_interrupt_config, capsense_msc0_isr);
         NVIC_ClearPendingIRQ(capsense_msc0_interrupt_config.intrSrc);
         NVIC_EnableIRQ(capsense_msc0_interrupt_config.intrSrc);
-/* setting Dither parameter
-         * Must be called after Cy_CapSense_Init() and before Cy_CapSense_Enable()
-         */
-         set_Dither_parameters();
+
         /* Initialize the CAPSENSE firmware modules. */
         status = Cy_CapSense_Enable(&cy_capsense_context);
     }
@@ -220,7 +195,6 @@ static void capsense_msc0_isr(void)
     Cy_CapSense_InterruptHandler(CY_MSCLP0_HW, &cy_capsense_context);
 }
 
-#if !SWD_DEBUG_ENABLE
 /*******************************************************************************
 * Function Name: initialize_capsense_tuner
 ********************************************************************************
@@ -273,30 +247,22 @@ static void ezi2c_isr(void)
 {
     Cy_SCB_EZI2C_Interrupt(CYBSP_EZI2C_HW, &ezi2c_context);
 }
-#endif
 
+#if ENABLE_SPI_SERIAL_LED
 /*******************************************************************************
 * Function Name: led_control
 ********************************************************************************
 * Summary:
 * Logic to control the on / off status with green color and brightness of LED1 and LED3
 * based on the touch status of the CAPSENSE touchpad widget.
-*
+* Brightness of each LED is represented by 0 to 255,
+*  where 0 indicates LED in OFF state and 255 indicate maximum
+*  brightness of an LED
 *******************************************************************************/
 void led_control()
 {
-    /* Brightness of each LED is represented by 0 to 255,
-    *  where 0 indicates LED in OFF state and 255 indicate maximum
-    *  brightness of an LED
-    */
-    volatile uint8_t brightness_max = 255u;
-    volatile uint8_t brightness_min = 0u;
-
-    uint8_t touchposition_x, touchposition_y ;
-    cy_stc_capsense_touch_t *panelTouch = Cy_CapSense_GetTouchInfo(CY_CAPSENSE_TOUCHPAD_SELF_CAP_WDGT_ID, &cy_capsense_context);
-
-    touchposition_x = panelTouch->ptrPosition->x;
-    touchposition_y = brightness_max - panelTouch->ptrPosition->y;
+   cy_stc_capsense_touch_t *panelTouch=NULL;
+   uint8_t touchposition_x, touchposition_y ;
 
 /*******************************************************************************
 * If the CSD Touchpad is active, Turn On LED1 and LED3
@@ -305,13 +271,19 @@ void led_control()
 *******************************************************************************/
     if (SENSOR_ACTIVE == Cy_CapSense_IsWidgetActive(CY_CAPSENSE_TOUCHPAD_SELF_CAP_WDGT_ID, &cy_capsense_context))
     {
-        led_context.led_num[LED1].color_red = brightness_min;
-        led_context.led_num[LED1].color_green = touchposition_x;
-        led_context.led_num[LED1].color_blue = brightness_min;
+        panelTouch = Cy_CapSense_GetTouchInfo(CY_CAPSENSE_TOUCHPAD_SELF_CAP_WDGT_ID, &   cy_capsense_context);
+    
+        touchposition_x = panelTouch->ptrPosition->x;
+        touchposition_y = panelTouch->ptrPosition->y;
 
-        led_context.led_num[LED3].color_red = brightness_min;
+        led_context.led_num[LED1].color_red = 0u;
+        led_context.led_num[LED1].color_green = touchposition_x;
+        led_context.led_num[LED1].color_blue = 0u;
+
+        led_context.led_num[LED3].color_red = 0u;
         led_context.led_num[LED3].color_green = touchposition_y;
-        led_context.led_num[LED3].color_blue = brightness_min;
+        led_context.led_num[LED3].color_blue = 0u;
+
     }
 
 /*******************************************************************************
@@ -319,58 +291,46 @@ void led_control()
 ********************************************************************************/
      else
      {
-        led_context.led_num[LED1].color_red = brightness_min;
-        led_context.led_num[LED1].color_green = brightness_min;
-        led_context.led_num[LED1].color_blue = brightness_min;
+        led_context.led_num[LED1].color_red = 0u;
+        led_context.led_num[LED1].color_green = 0u;
+        led_context.led_num[LED1].color_blue = 0u;
 
-        led_context.led_num[LED3].color_red = brightness_min;
-        led_context.led_num[LED3].color_green = brightness_min;
-        led_context.led_num[LED3].color_blue = brightness_min;
+        led_context.led_num[LED3].color_red = 0u;
+        led_context.led_num[LED3].color_green = 0u;
+        led_context.led_num[LED3].color_blue = 0u;
      }
 
-    led_context.led_num[LED2].color_red = brightness_min;
-    led_context.led_num[LED2].color_green = brightness_min;
-    led_context.led_num[LED2].color_blue = brightness_min;
+    led_context.led_num[LED2].color_red = 0u;
+    led_context.led_num[LED2].color_green = 0u;
+    led_context.led_num[LED2].color_blue = 0u;
 
     serial_led_control(&led_context);
 }
+#endif
+
+#if CY_CAPSENSE_BIST_EN
 /*******************************************************************************
-* Function Name: set_Dither_parameters
+* Function Name: measure_sensor_capacitance
 ********************************************************************************
 * Summary:
-*  This functions sets the below CDAC Dither parameters to achive better performance
-*  1. CDAC_Dither_Scale
-*       - Default value is '0'
-*       - Recommended value defined in macro 'CDAC_DITHER_SCALE'
-*  2. CDAC_Dither_poly
-*       - Default value is '142'
-*       - Recommended value defined in macro 'CDAC_DITHER_POLY'
-*  3. CDAC_Dither_Seed
-*       - Default value is '255'
-*       - Recommended value defined in macro 'CDAC_DITHER_SEED'
+*  Measures the self capacitance of the sensor electrode (Cp) in Femto Farad and
+*  stores its value in the variable button0_cp and button1_cp.
 *
-*  Note : Must be called after Cy_CapSense_Init() and before Cy_CapSense_Enable
-*
-*  Refer CE Readme for more details
-*  Parameters:  void
-*  Return:  void
 *******************************************************************************/
-static void set_Dither_parameters(void)
+static void measure_sensor_capacitance(uint32_t *sensor_capacitance)
 {
-    uint32_t wdIndex;
+    /* For BIST configuration Connecting all Inactive sensor connections (ISC) of CSD sensors to to shield*/
+    Cy_CapSense_SetInactiveElectrodeState(CY_CAPSENSE_SNS_CONNECTION_SHIELD,
+                                                  CY_CAPSENSE_BIST_CSD_GROUP, &cy_capsense_context);
 
-    /* set Dither scale for each widgets*/
-    for (wdIndex = 0u; wdIndex < CY_CAPSENSE_TOTAL_WIDGET_COUNT; wdIndex++)
-    {
-        cy_capsense_context.ptrWdContext[wdIndex].cdacDitherValue = CDAC_DITHER_SCALE;
-    }
+    /*Runs the BIST to measure the sensor capacitance*/
+    Cy_CapSense_RunSelfTest(CY_CAPSENSE_BIST_SNS_CAP_MASK,
+                &cy_capsense_context);
+        memcpy(sensor_capacitance,
+                cy_capsense_context.ptrWdConfig->ptrSnsCapacitance,
+                CY_CAPSENSE_SENSOR_COUNT * sizeof(uint32_t));
 
-    /* set Dither poly for all widgets*/
-    cy_capsense_context.ptrInternalContext->cdacDitherPoly = CDAC_DITHER_POLY;
-
-    /* set Dither seed for all widgets*/
-    cy_capsense_context.ptrInternalContext->cdacDitherSeed = CDAC_DITHER_SEED;
 }
-
+#endif 
 
 /* [] END OF FILE */
