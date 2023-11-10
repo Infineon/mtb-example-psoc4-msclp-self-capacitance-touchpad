@@ -6,7 +6,7 @@ In addition, this code example also explains how to manually tune the self-capac
 
 [View this README on GitHub.](https://github.com/Infineon/mtb-example-psoc4-msclp-self-capacitance-touchpad)
 
-[Provide feedback on this code example.](https://cypress.co1.qualtrics.com/jfe/form/SV_1NTns53sK2yiljn?Q_EED=eyJVbmlxdWUgRG9jIElkIjoiQ0UyMzUzMzgiLCJTcGVjIE51bWJlciI6IjAwMi0zNTMzOCIsIkRvYyBUaXRsZSI6IlBTb0MmdHJhZGU7IDQ6IE1TQ0xQIHNlbGYtY2FwYWNpdGFuY2UgdG91Y2hwYWQgdHVuaW5nIiwicmlkIjoieWFzaHZpIiwiRG9jIHZlcnNpb24iOiIyLjAuMCIsIkRvYyBMYW5ndWFnZSI6IkVuZ2xpc2giLCJEb2MgRGl2aXNpb24iOiJNQ0QiLCJEb2MgQlUiOiJJQ1ciLCJEb2MgRmFtaWx5IjoiUFNPQyJ9)
+[Provide feedback on this code example.](https://cypress.co1.qualtrics.com/jfe/form/SV_1NTns53sK2yiljn?Q_EED=eyJVbmlxdWUgRG9jIElkIjoiQ0UyMzUzMzgiLCJTcGVjIE51bWJlciI6IjAwMi0zNTMzOCIsIkRvYyBUaXRsZSI6IlBTb0MmdHJhZGU7IDQ6IE1TQ0xQIHNlbGYtY2FwYWNpdGFuY2UgdG91Y2hwYWQgdHVuaW5nIiwicmlkIjoieWFzaHZpIiwiRG9jIHZlcnNpb24iOiIyLjAuMSIsIkRvYyBMYW5ndWFnZSI6IkVuZ2xpc2giLCJEb2MgRGl2aXNpb24iOiJNQ0QiLCJEb2MgQlUiOiJJQ1ciLCJEb2MgRmFtaWx5IjoiUFNPQyJ9)
 
 ## Requirements
 
@@ -30,7 +30,7 @@ In addition, this code example also explains how to manually tune the self-capac
 
 ## Hardware setup
 
-This example uses the board's default configuration. See the [kit user guide](www.infineon.com/002-34472) to ensure that the board is configured correctly.
+This example uses the board's default configuration. See the [kit user guide](www.infineon.com/002-34472) to ensure that the board is configured correctly to use VDDA at 1.8 V
 
 **Note:** The PSoC&trade; 4 kits (except [CY8CKIT-040T](https://www.infineon.com/CY8CKIT-040T) and [CY8CKIT-041S-MAX](https://www.infineon.com/CY8CKIT-041s-max)) ship with KitProg2 installed. ModusToolbox&trade; software requires KitProg3. Before using this code example, make sure that the board is upgraded to KitProg3. The tool and instructions are available in the [Firmware Loader](https://github.com/Infineon/Firmware-loader) GitHub repository. If you do not upgrade, you will see an error like "unable to find CMSIS-DAP device" or "KitProg firmware is out of date".
 
@@ -177,6 +177,12 @@ The project already has the necessary settings by default, so you can go to [Ope
 
 3. After programming, the application starts automatically.
 
+> **Note:** After programming, you see the following error message if debug mode is disabled. This can be ignored or enabling debug solves this error.
+
+   ``` c
+   "Error: Error connecting Dp: Cannot read IDR"
+   ```
+
 4. To test the application, slide your finger over the CAPSENSE&trade; touchpad and notice that LED1 and LED3 turn ON with a green color when touched and turn OFF when the finger is lifted.
 
    - LED1 brightness increases when the finger is swiped from left to right.
@@ -244,6 +250,18 @@ The project already has the necessary settings by default, so you can go to [Ope
 12. Verify that the SNR is greater than 5:1 and the signal count is above 50 by following the steps given in [Stage 4: Obtain noise and crossover point](#stage-4-obtain-noise-and crossover-point).
 
 Non-reporting of false touches and the linearity of the position graph indicate proper tuning.
+
+## Operation at other voltages
+
+[CY8CKIT-040T kit](https://www.infineon.com/CY8CKIT-040T) supports operating voltages of 1.8 V, 3.3 V, and 5 V. Use voltage selection switch available on top of the kit to set the preferred operating voltage and see the [setup the VDDA supply voltage and Debug mode](#set-up-the-vdda-supply-voltage-and-debug-mode-in-device-configurator) section .
+
+This application functionalities are optimally tuned for 1.8 V. However, you can observe the basic functionalities working across other voltages. 
+
+It is recommended to tune application for the preferred voltages for better performance.
+
+</details>
+
+<br>
 
 
 
@@ -720,6 +738,8 @@ After confirming that your design meets the timing parameters, and the SNR is gr
 
 You can debug the example to step through the code. In the IDE, use the **\<Application Name> Debug (KitProg3_MiniProg4)** configuration in the **Quick Panel**. For more details, see the "Program and Debug" section in the [Eclipse IDE for ModusToolbox&trade; software user guide](https://www.infineon.com/MTBEclipseIDEUserGuide).
 
+By default, the debug option is disabled in the device configurator. To enable the debug option, see the [Setup VDDA and Debug mode](#set-up-the-vdda-supply-voltage-and-debug-mode-in-device-configurator) section. To achieve low power consumption, it is recommended to disable it.
+
 
 ## Design and implementation
 
@@ -727,7 +747,7 @@ The project contains a touchpad widget configured in CSD-RM sensing mode. See th
 
 The project uses the [CAPSENSE&trade; middleware](https://github.com/Infineon/capsense) (see ModusToolbox&trade; user guide for more details on selecting a middleware). See [AN85951 – PSoC&trade; 4 and PSoC&trade; 6 MCU CAPSENSE&trade; design guide](https://www.infineon.com/AN85951) for more details on CAPSENSE&trade; features and usage.
 
-The [ModusToolbox&trade; software](https://www.infineon.com/modustoolbox) provides a GUI-based tuner application for debugging and tuning the CAPSENSE&trade; system. The CAPSENSE&trade; Tuner application works with EZI2C and UART communication interfaces. This project has an SCB block configured in EZI2C mode to establish communication with the onboard KitProg, which in turn enables reading the CAPSENSE&trade; raw data by the CAPSENSE&trade; Tuner; see Figure 24.
+The [ModusToolbox&trade; software](https://www.infineon.com/modustoolbox) provides a GUI-based tuner application for debugging and tuning the CAPSENSE&trade; system. The CAPSENSE&trade; Tuner application works with EZI2C and UART communication interfaces. This project has an SCB block configured in EZI2C mode to establish communication with the onboard KitProg, which in turn enables reading the CAPSENSE&trade; raw data by the CAPSENSE&trade; Tuner; see Figure 26.
 
 The CAPSENSE&trade; data structure that contains the CAPSENSE&trade; raw data is exposed to the CAPSENSE&trade; Tuner by setting up the I2C communication data buffer with the CAPSENSE&trade; data structure. This enables the tuner to access the CAPSENSE&trade; raw data for tuning and debugging CAPSENSE&trade;.
 
@@ -736,7 +756,7 @@ The successful tuning of the touchpad is indicated by the RGB LED in the Evaluat
 The MOSI pin of the SPI slave peripheral is used to transfer data to the three serially connected LEDs for controlling color, brightness, and ON or OFF operation. The three LEDs form a daisy-chain connection, and communication happens over the serial interface to create an RGB configuration. The LED accepts a 8-bit input code, with three bytes for red, green, and blue color, five bits for global brightness, and three blank '1' bits. See the [LED datasheet](https://media.digikey.com/pdf/Data%20Sheets/Everlight%20PDFs/12-23C_RSGHBHW-5V01_2C_Rev4_12-17-18.pdf) for more details.
 
 
-### Steps to set up the VDDA supply voltage in Device Configurator
+### Set up the VDDA supply voltage and debug mode in Device Configurator
 
 1. Open Device Configurator from the **Quick Panel**.
 
@@ -746,17 +766,23 @@ The MOSI pin of the SPI slave peripheral is used to transfer data to the three s
 
    <img src="images/vdda-settings.png" alt=""/>
 
+3. By default, the debug mode is disabled for this application to reduce power consumption. Enable the debug mode to enable the SWD pins as follows:
+
+   ##### **Figure 25. Enable debug mode in the System tab of Device Configurator**
+
+   <img src="images/enable_debug.png" alt="Figure 25"/>
+
 
 
 ### Resources and settings
 
-**Figure 25. EZI2C settings**
+**Figure 26. EZI2C settings**
 
 <img src="images/ezi2c-config.png" alt="" width="600"/>
 
 <br>
 
-**Figure 26. SPI settings**
+**Figure 27. SPI settings**
 
 <img src="images/spi-settings.png" alt="" width="600"/>
 
@@ -775,7 +801,7 @@ The MOSI pin of the SPI slave peripheral is used to transfer data to the three s
 
 ### Firmware flow
 
-**Figure 27. Firmware flowchart**
+**Figure 28. Firmware flowchart**
 
 <img src="images/firmware_flow.png" alt="Figure 27" width="400"/>
 
@@ -810,6 +836,7 @@ Document title: *CE235338* - *PSoC&trade; 4: MSCLP self-capacitance touchpad tun
 | 1.0.0   | New code example. <br /> This version is not backward compatible with ModusToolbox&trade; software v2.4.
 | 1.1.0   | Minor folder structure changes that does not break backward compatibility.
 | 2.0.0   | Major update to support ModusToolbox&trade; software v3.1<br> This version is not backward compatible with ModusToolbox&trade; software v3.0.
+| 2.0.1   | Minor configuration and readme update.
 
 ------
 
