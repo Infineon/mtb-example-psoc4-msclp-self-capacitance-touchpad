@@ -63,10 +63,6 @@ static void initialize_capsense_tuner(void);
 void led_control();
 #endif
 
-#if CY_CAPSENSE_BIST_EN
-static void measure_sensor_capacitance(uint32_t *sensor_capacitance);
-#endif 
-
 /*******************************************************************************
 * Function Name: main
 ********************************************************************************
@@ -85,10 +81,6 @@ static void measure_sensor_capacitance(uint32_t *sensor_capacitance);
 int main(void)
 {
     cy_rslt_t result;
-
-    #if CY_CAPSENSE_BIST_EN
-    uint32_t sensor_capacitance[CY_CAPSENSE_SENSOR_COUNT];
-    #endif
 
     /* Initialize the device and board peripherals */
     result = cybsp_init();
@@ -109,11 +101,6 @@ int main(void)
 
     /* Initialize MSCLP CAPSENSE */
     initialize_capsense();
-
-    #if CY_CAPSENSE_BIST_EN
-    /* Measure the self capacitance of sensor electrode using BIST */
-    measure_sensor_capacitance(sensor_capacitance);
-    #endif 
 
     /* Start the first scan */
     Cy_CapSense_ScanAllSlots(&cy_capsense_context);
@@ -307,30 +294,5 @@ void led_control()
     serial_led_control(&led_context);
 }
 #endif
-
-#if CY_CAPSENSE_BIST_EN
-/*******************************************************************************
-* Function Name: measure_sensor_capacitance
-********************************************************************************
-* Summary:
-*  Measures the self capacitance of the sensor electrode (Cp) in Femto Farad and
-*  stores its value in the variable button0_cp and button1_cp.
-*
-*******************************************************************************/
-static void measure_sensor_capacitance(uint32_t *sensor_capacitance)
-{
-    /* For BIST configuration Connecting all Inactive sensor connections (ISC) of CSD sensors to to shield*/
-    Cy_CapSense_SetInactiveElectrodeState(CY_CAPSENSE_SNS_CONNECTION_SHIELD,
-                                                  CY_CAPSENSE_BIST_CSD_GROUP, &cy_capsense_context);
-
-    /*Runs the BIST to measure the sensor capacitance*/
-    Cy_CapSense_RunSelfTest(CY_CAPSENSE_BIST_SNS_CAP_MASK,
-                &cy_capsense_context);
-        memcpy(sensor_capacitance,
-                cy_capsense_context.ptrWdConfig->ptrSnsCapacitance,
-                CY_CAPSENSE_SENSOR_COUNT * sizeof(uint32_t));
-
-}
-#endif 
 
 /* [] END OF FILE */
